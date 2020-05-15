@@ -15,6 +15,8 @@ use prometheus::{TextEncoder, Encoder};
 use hyper::{header::CONTENT_TYPE, rt::Future, service::service_fn_ok, Body, Response, Server};
 use std::net::SocketAddr;
 use sqlite::State;
+use std::net::IpAddr;
+use maxminddb::geoip2;
 
 mod metrics;
 
@@ -62,33 +64,43 @@ fn main() {
     // Parse address used to bind exporter to.
     let addr_raw = expose_host.to_owned() + ":" + expose_port;
     let addr: SocketAddr = addr_raw.parse().expect("can not parse listen addr");
-    
+
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
-      
+
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
 
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
+        let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
 
         let mut statement = connection
             .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1")
             .unwrap();
-
         while let State::Row = statement.next().unwrap() {
+          let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
+          let city: geoip2::City = georeader.lookup(ip).unwrap();
+          let c_name = city.city
+                    .and_then(|cy| cy.names)
+                    .and_then(|n| n.get("en")
+                    .map(String::from));
 
+          let loc = city.location.unwrap();
+          let lat = loc.latitude.unwrap();
+          let lon = loc.longitude.unwrap();
           let label_values = [
             &statement.read::<String>(0).unwrap()[..],
             &statement.read::<String>(1).unwrap()[..],
             &statement.read::<String>(2).unwrap()[..],
             &statement.read::<String>(3).unwrap()[..],
             &statement.read::<String>(4).unwrap()[..],
-            &statement.read::<String>(5).unwrap()[..]
+            &statement.read::<String>(5).unwrap()[..],
+            &c_name.unwrap_or("None".to_string()),
+            &lat.to_string(),
+            &lon.to_string()
           ];
-          
-          //duration.with_label_values(&label_values).set(2.0);
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
           metrics::BYTES_IN.with_label_values(&label_values).set(statement.read::<f64>(7).unwrap());
@@ -99,13 +111,15 @@ fn main() {
           metrics::DURATION.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
           metrics::BYTES_IN.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
           metrics::BYTES_OUT.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
-        }  
+
+        }
 
         // Gather the metrics.
         let mut buffer = vec![];
         let metric_families = prometheus::gather();
+
         encoder.encode(&metric_families, &mut buffer).unwrap();
-        
+
         Response::builder()
           .status(200)
           .header(CONTENT_TYPE, encoder.format_type())
@@ -113,7 +127,7 @@ fn main() {
           .unwrap()
       })
     };
-    
+
     let server = Server::bind(&addr)
       .serve(new_service)
       .map_err(|e| eprintln!("Server error: {}", e));

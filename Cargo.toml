@@ -12,6 +12,7 @@ prometheus = { git = "https://github.com/lfdominguez/rust-prometheus.git" }
 sqlite = "0.24.0"
 lazy_static = "1.4.0"
 hyper = "0.12.33"
+maxminddb = "0.13"
 
 [profile.dev]
 opt-level = 0
