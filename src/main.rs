@@ -109,11 +109,11 @@ fn main() {
           metrics::BYTES_IN.with_label_values(&label_values).set(statement.read::<f64>(7).unwrap());
           metrics::BYTES_OUT.with_label_values(&label_values).set(statement.read::<f64>(8).unwrap());
 
-          let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
+          //let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
 
-          metrics::DURATION.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
-          metrics::BYTES_IN.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
-          metrics::BYTES_OUT.with_label_values(&label_values).set_timestamp_ms(timestamp_ms);
+          metrics::DURATION.with_label_values(&label_values);//.set_stimestamp_ms(timestamp_ms);
+          metrics::BYTES_IN.with_label_values(&label_values);//.set_timestamp_ms(timestamp_ms);
+          metrics::BYTES_OUT.with_label_values(&label_values);//.set_timestamp_ms(timestamp_ms);
 
         }
 
