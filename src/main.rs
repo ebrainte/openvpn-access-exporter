@@ -73,9 +73,6 @@ fn main() {
 
       service_fn_ok(move |_request| {
 
-
-        info!("receiving request");
-    
         metrics::ACCESS_COUNTER.inc();
         let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
 
