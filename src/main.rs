@@ -81,15 +81,19 @@ fn main() {
             .unwrap();
         while let State::Row = statement.next().unwrap() {
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
-          let city: geoip2::City = georeader.lookup(ip).unwrap();
-          let c_name = city.city
-                    .and_then(|cy| cy.names)
-                    .and_then(|n| n.get("en")
-                    .map(String::from));
+          
+          let city: std::result::Result<Option<geoip2::City>, maxminddb::MaxMindDBError> = georeader.lookup(ip);
+          let (c_name, lat, lon) = match city {
+            Ok(Some(city)) => (
+              city.city.and_then(|cy| cy.names)
+                       .and_then(|n| n.get("en")
+                       .map(String::from)),
+              city.location.as_ref().unwrap().latitude.unwrap(),
+              city.location.as_ref().unwrap().longitude.unwrap()
+             ),
+             _ => (Some("unknown".to_owned()), 0.0_f64, 0.0_f64),
+          };
 
-          let loc = city.location.unwrap();
-          let lat = loc.latitude.unwrap();
-          let lon = loc.longitude.unwrap();
           let label_values = [
             &statement.read::<String>(0).unwrap()[..],
             &statement.read::<String>(1).unwrap()[..],
@@ -106,12 +110,9 @@ fn main() {
           metrics::BYTES_IN.with_label_values(&label_values).set(statement.read::<f64>(7).unwrap());
           metrics::BYTES_OUT.with_label_values(&label_values).set(statement.read::<f64>(8).unwrap());
 
-          //let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
-
-          metrics::DURATION.with_label_values(&label_values);//.set_stimestamp_ms(timestamp_ms);
-          metrics::BYTES_IN.with_label_values(&label_values);//.set_timestamp_ms(timestamp_ms);
-          metrics::BYTES_OUT.with_label_values(&label_values);//.set_timestamp_ms(timestamp_ms);
-
+          metrics::DURATION.with_label_values(&label_values);
+          metrics::BYTES_IN.with_label_values(&label_values);
+          metrics::BYTES_OUT.with_label_values(&label_values);
         }
 
         // Gather the metrics.
