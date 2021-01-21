@@ -77,7 +77,7 @@ fn main() {
         let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
 
         let mut statement = connection
-            .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1")
+            .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
         while let State::Row = statement.next().unwrap() {
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
