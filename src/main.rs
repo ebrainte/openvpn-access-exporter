@@ -94,6 +94,8 @@ fn main() {
              _ => (Some("unknown".to_owned()), 0.0_f64, 0.0_f64),
           };
 
+          let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
+
           let label_values = [
             &statement.read::<String>(0).unwrap()[..],
             &statement.read::<String>(1).unwrap()[..],
@@ -103,7 +105,8 @@ fn main() {
             &statement.read::<String>(5).unwrap()[..],
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
-            &lon.to_string()
+            &lon.to_string(),
+            &timestamp_ms.to_string()
           ];
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
