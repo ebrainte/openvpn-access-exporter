@@ -105,17 +105,18 @@ fn main() {
             &statement.read::<String>(5).unwrap()[..],
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
-            &lon.to_string(),
-            &timestamp_ms.to_string()
+            &lon.to_string()
           ];
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
           metrics::BYTES_IN.with_label_values(&label_values).set(statement.read::<f64>(7).unwrap());
           metrics::BYTES_OUT.with_label_values(&label_values).set(statement.read::<f64>(8).unwrap());
+          metrics::RECORD_TIMESTAMP.with_label_values(&label_values).set(timestamp_ms as f64);
 
           metrics::DURATION.with_label_values(&label_values);
           metrics::BYTES_IN.with_label_values(&label_values);
           metrics::BYTES_OUT.with_label_values(&label_values);
+          metrics::RECORD_TIMESTAMP.with_label_values(&label_values);
         }
 
         // Gather the metrics.
