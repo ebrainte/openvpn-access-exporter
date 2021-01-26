@@ -1,6 +1,6 @@
 [package]
 name = "openvpn-access-exporter"
-version = "2.0.13"
+version = "2.0.14"
 authors = ["Luis Felipe Domínguez Vega <ldominguezvega@gmail.com>"]
 edition = "2018"
 

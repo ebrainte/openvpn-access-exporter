@@ -103,7 +103,7 @@ fn main() {
 
           // Find user full name from ldap database
           let mut statement_ldap = connection_ldap
-              .prepare("SELECT TRIM(cn,'\'') from users where upper(uid) = upper(?)")
+              .prepare("SELECT cn from users where upper(uid) = upper(?)")
               .unwrap();
 
           statement_ldap.bind(1, &username.as_ref().unwrap()[..]).unwrap();
