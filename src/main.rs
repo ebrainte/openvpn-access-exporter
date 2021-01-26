@@ -64,24 +64,28 @@ fn main() {
     // Parse address used to bind exporter to.
     let addr_raw = expose_host.to_owned() + ":" + expose_port;
     let addr: SocketAddr = addr_raw.parse().expect("can not parse listen addr");
-
+    
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
 
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
 
+      let connection_ldap = sqlite::open("/usr/share/ldap/ldap.db").unwrap();
+
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
         let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
-
+          
+        // Assumes session older than 24 hours are not active anymore (since active flag is not always updated properly)
         let mut statement = connection
             .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
         while let State::Row = statement.next().unwrap() {
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
           
+          // Find location associated with IP
           let city: std::result::Result<Option<geoip2::City>, maxminddb::MaxMindDBError> = georeader.lookup(ip);
           let (c_name, lat, lon) = match city {
             Ok(Some(city)) => (
@@ -95,12 +99,25 @@ fn main() {
           };
 
           let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
+          let username = statement.read::<String>(2);
+
+          // Find user full name from ldap database
+          let mut statement_ldap = connection_ldap
+              .prepare("SELECT TRIM(cn,'\'') from users where upper(uid) = upper(?)")
+              .unwrap();
+
+          statement_ldap.bind(1, &username.as_ref().unwrap()[..]).unwrap();
+
+          let mut fullname = "Unknown".to_string();
+          while let State::Row = statement_ldap.next().unwrap() {
+            fullname = statement_ldap.read::<String>(0).unwrap();
+          }
 
           let label_values = [
-            &statement.read::<String>(0).unwrap()[..],
+            &statement.read::<String>(0).unwrap()[..], 
             &statement.read::<String>(1).unwrap()[..],
             &statement.read::<String>(2).unwrap()[..],
-            &statement.read::<String>(3).unwrap()[..],
+            &fullname,
             &statement.read::<String>(4).unwrap()[..],
             &statement.read::<String>(5).unwrap()[..],
             &c_name.unwrap_or("None".to_string()),
