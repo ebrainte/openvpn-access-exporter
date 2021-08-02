@@ -32,6 +32,27 @@ fn main() {
             .required(true)
             .takes_value(true)
         )
+        .arg(Arg::with_name("userpropfile")
+            .short("u")
+            .long("userpropfile")
+            .help("SQLite userprop file (userprop.db)")
+            .required(true)
+            .takes_value(true)
+        )
+        .arg(Arg::with_name("ldapfile")
+            .short("l")
+            .long("ldapfile")
+            .help("SQLite LDAP file (ldap.db)")
+            .required(true)
+            .takes_value(true)
+        )
+        .arg(Arg::with_name("geofile")
+            .short("g")
+            .long("geofile")
+            .help("GeoLite2 City file (GeoLite2-City.mmdb)")
+            .required(true)
+            .takes_value(true)
+        )
         .arg(Arg::with_name("port")
             .short("p")
             .long("port")
@@ -50,8 +71,6 @@ fn main() {
         )
         .get_matches();
 
-    //let ovpn_log = flags.value_of("file").unwrap();
-    //let ovpn_log = format!("{}", flags.value_of("file").unwrap())[..];
     let expose_port = flags.value_of("port").unwrap();
     let expose_host = flags.value_of("host").unwrap();
 
@@ -60,6 +79,9 @@ fn main() {
     Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Using file: {}", flags.value_of("file").unwrap());
+    info!("Using userpropfile: {}", flags.value_of("userpropfile").unwrap());
+    info!("Using ldapfile: {}", flags.value_of("ldapfile").unwrap());
+    info!("Using geofile: {}", flags.value_of("geofile").unwrap());
 
     // Parse address used to bind exporter to.
     let addr_raw = expose_host.to_owned() + ":" + expose_port;
@@ -67,20 +89,27 @@ fn main() {
     
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
+      let ovpn_userprop = flags.value_of("userpropfile").unwrap();
+      let ovpn_ldap = flags.value_of("ldapfile").unwrap();
+      let ovpn_geo = flags.value_of("geofile").unwrap();
 
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
 
-      let connection_ldap = sqlite::open("/usr/share/ldap/ldap.db").unwrap();
+      let connection_ldap = sqlite::open(&ovpn_ldap).unwrap();
 
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
-        let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
-          
+        let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
+        
+        # Attaching userprop database to allow join between logs and user properties
+        let mut attach_statement = try!(connection.prepare("ATTACH :dbfile AS userpropdb"));
+        attach_statement.execute_named(&[(":dbfile", &ovpn_userprop)])
+
         // Assumes session older than 24 hours are not active anymore (since active flag is not always updated properly)
         let mut statement = connection
-            .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
+            .prepare("SELECT l.session_id, l.node, l.username, l.common_name, l.real_ip, l.vpn_ip, l.duration, l.bytes_in, l.bytes_out, l.timestamp, (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_installed' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_seen' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_check' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'pvt_hw_addr' AND lower(p.name) = lower(l.username)) FROM log l WHERE l.active = 1 and l.auth = 1 and l.start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
         while let State::Row = statement.next().unwrap() {
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
@@ -122,7 +151,11 @@ fn main() {
             &statement.read::<String>(5).unwrap()[..],
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
-            &lon.to_string()
+            &lon.to_string(),
+            &statement.read::<String>(10).unwrap()[..],
+            &statement.read::<String>(11).unwrap()[..],
+            &statement.read::<String>(12).unwrap()[..],
+            &statement.read::<String>(13).unwrap()[..]
           ];
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
