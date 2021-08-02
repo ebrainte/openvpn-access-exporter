@@ -94,32 +94,26 @@ fn main() {
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
       let ovpn_ldap = flags.value_of("ldapfile").unwrap();
+      let ovpn_userprop = flags.value_of("userpropfile").unwrap();
 
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
       let connection_ldap = sqlite::open(&ovpn_ldap).unwrap();
+
+      // Attaching userprop database to allow join between logs and user properties
+      let attach_command = format!("ATTACH '{}' AS userpropdb;", &ovpn_userprop);
+      connection.execute(&attach_command).unwrap();
 
       // Need to clone before moving to closure. 
       // Ref.: https://stackoverflow.com/a/67697017/1003873
       let flags = flags.clone();
 
       service_fn_ok(move |_request| {
-        //let flags = flags.clone();
         let ovpn_geo = flags.value_of("geofile").unwrap();
-        let ovpn_userprop = flags.value_of("userpropfile").unwrap();
-
-        info!("Using geofile: {}", &ovpn_geo);
 
         metrics::ACCESS_COUNTER.inc();
         let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
         
-        // Attaching userprop database to allow join between logs and user properties
-        let mut attach_statement = connection
-          .prepare("ATTACH ? AS userpropdb")
-          .unwrap();
-
-        attach_statement.bind(1, ovpn_userprop).unwrap();
-
         // Assumes session older than 24 hours are not active anymore (since active flag is not always updated properly)
         let mut statement = connection
             .prepare("SELECT l.session_id, l.node, l.username, l.common_name, l.real_ip, l.vpn_ip, l.duration, l.bytes_in, l.bytes_out, l.timestamp, (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_installed' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_seen' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_check' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'pvt_hw_addr' AND lower(p.name) = lower(l.username)) FROM log l WHERE l.active = 1 and l.auth = 1 and l.start_time >= strftime('%s', datetime('now','-1 days'))")
