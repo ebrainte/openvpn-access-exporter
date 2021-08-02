@@ -86,26 +86,39 @@ fn main() {
     // Parse address used to bind exporter to.
     let addr_raw = expose_host.to_owned() + ":" + expose_port;
     let addr: SocketAddr = addr_raw.parse().expect("can not parse listen addr");
-    
+
+    // Need to clone before moving to closure. 
+    // Ref.: https://stackoverflow.com/a/67697017/1003873
+    let flags = flags.clone();
+
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
-      let ovpn_userprop = flags.value_of("userpropfile").unwrap();
       let ovpn_ldap = flags.value_of("ldapfile").unwrap();
-      let ovpn_geo = flags.value_of("geofile").unwrap();
 
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
-
       let connection_ldap = sqlite::open(&ovpn_ldap).unwrap();
 
+      // Need to clone before moving to closure. 
+      // Ref.: https://stackoverflow.com/a/67697017/1003873
+      let flags = flags.clone();
+
       service_fn_ok(move |_request| {
+        //let flags = flags.clone();
+        let ovpn_geo = flags.value_of("geofile").unwrap();
+        let ovpn_userprop = flags.value_of("userpropfile").unwrap();
+
+        info!("Using geofile: {}", &ovpn_geo);
 
         metrics::ACCESS_COUNTER.inc();
         let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
         
-        # Attaching userprop database to allow join between logs and user properties
-        let mut attach_statement = try!(connection.prepare("ATTACH :dbfile AS userpropdb"));
-        attach_statement.execute_named(&[(":dbfile", &ovpn_userprop)])
+        // Attaching userprop database to allow join between logs and user properties
+        let mut attach_statement = connection
+          .prepare("ATTACH ? AS userpropdb")
+          .unwrap();
+
+        attach_statement.bind(1, ovpn_userprop).unwrap();
 
         // Assumes session older than 24 hours are not active anymore (since active flag is not always updated properly)
         let mut statement = connection
