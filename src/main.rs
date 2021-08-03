@@ -159,10 +159,10 @@ fn main() {
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
             &lon.to_string(),
-            &statement.read::<String>(10).unwrap()[..],
-            &statement.read::<String>(11).unwrap()[..],
-            &statement.read::<String>(12).unwrap()[..],
-            &statement.read::<String>(13).unwrap()[..]
+            &statement.read::<String>(10).unwrap_or("-1".to_string())[..],
+            &statement.read::<String>(11).unwrap_or("".to_string())[..],
+            &statement.read::<String>(12).unwrap_or("".to_string())[..],
+            &statement.read::<String>(13).unwrap_or("".to_string())[..]
           ];
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
