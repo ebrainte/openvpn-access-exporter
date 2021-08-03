@@ -116,7 +116,7 @@ fn main() {
         
         // Assumes session older than 24 hours are not active anymore (since active flag is not always updated properly)
         let mut statement = connection
-            .prepare("SELECT l.session_id, l.node, l.username, l.common_name, l.real_ip, l.vpn_ip, l.duration, l.bytes_in, l.bytes_out, l.timestamp, (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_installed' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_seen' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_check' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'pvt_hw_addr' AND lower(p.name) = lower(l.username)) FROM log l WHERE l.active = 1 and l.auth = 1 and l.start_time >= strftime('%s', datetime('now','-1 days'))")
+            .prepare("SELECT l.session_id, l.node, l.username, l.common_name, l.real_ip, l.vpn_ip, l.duration, l.bytes_in, l.bytes_out, l.timestamp, (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_installed' AND lower(p.name) = lower(l.username)), (SELECT strftime('%s', c.value) FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_seen' AND lower(p.name) = lower(l.username)), (SELECT strftime('%s', c.value) FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'crowdstrike_last_check' AND lower(p.name) = lower(l.username)), (SELECT c.value FROM userpropdb.profile p, userpropdb.config c WHERE c.profile_id = p.id AND c.name = 'pvt_hw_addr' AND lower(p.name) = lower(l.username)) FROM log l WHERE l.active = 1 and l.auth = 1 and l.start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
         while let State::Row = statement.next().unwrap() {
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
@@ -135,6 +135,8 @@ fn main() {
           };
 
           let timestamp_ms = statement.read::<i64>(9).unwrap() * 1000;
+          let crowdstrike_last_seen_timestamp_ms = statement.read::<i64>(11).unwrap() * 1000;
+          let crowdstrike_last_check_timestamp_ms = statement.read::<i64>(12).unwrap() * 1000;
           let username = statement.read::<String>(2);
 
           // Find user full name from ldap database
@@ -159,9 +161,6 @@ fn main() {
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
             &lon.to_string(),
-            &statement.read::<String>(10).unwrap_or("-1".to_string())[..],
-            &statement.read::<String>(11).unwrap_or("".to_string())[..],
-            &statement.read::<String>(12).unwrap_or("".to_string())[..],
             &statement.read::<String>(13).unwrap_or("".to_string())[..]
           ];
 
@@ -170,10 +169,17 @@ fn main() {
           metrics::BYTES_OUT.with_label_values(&label_values).set(statement.read::<f64>(8).unwrap());
           metrics::RECORD_TIMESTAMP.with_label_values(&label_values).set(timestamp_ms as f64);
 
+          metrics::CROWDSTRIKE_INSTALLED.with_label_values(&label_values).set(statement.read::<f64>(10).unwrap_or(-1.0));
+          metrics::CROWDSTRIKE_LAST_SEEN_TIMESTAMP.with_label_values(&label_values).set(crowdstrike_last_seen_timestamp_ms as f64);
+          metrics::CROWDSTRIKE_LAST_CHECK_TIMESTAMP.with_label_values(&label_values).set(crowdstrike_last_check_timestamp_ms as f64);
+
           metrics::DURATION.with_label_values(&label_values);
           metrics::BYTES_IN.with_label_values(&label_values);
           metrics::BYTES_OUT.with_label_values(&label_values);
           metrics::RECORD_TIMESTAMP.with_label_values(&label_values);
+          metrics::CROWDSTRIKE_INSTALLED.with_label_values(&label_values);
+          metrics::CROWDSTRIKE_LAST_SEEN_TIMESTAMP.with_label_values(&label_values);
+          metrics::CROWDSTRIKE_LAST_CHECK_TIMESTAMP.with_label_values(&label_values);
         }
 
         // Gather the metrics.
