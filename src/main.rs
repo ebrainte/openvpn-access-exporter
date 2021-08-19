@@ -161,13 +161,16 @@ fn main() {
             &c_name.unwrap_or("None".to_string()),
             &lat.to_string(),
             &lon.to_string(),
+<<<<<<< HEAD
             &statement.read::<String>(13).unwrap_or("".to_string())[..]
+=======
+            &timestamp_ms.to_string()
+>>>>>>> parent of b7c6f85 (added record timestamp metrics)
           ];
 
           metrics::DURATION.with_label_values(&label_values).set(statement.read::<f64>(6).unwrap());
           metrics::BYTES_IN.with_label_values(&label_values).set(statement.read::<f64>(7).unwrap());
           metrics::BYTES_OUT.with_label_values(&label_values).set(statement.read::<f64>(8).unwrap());
-          metrics::RECORD_TIMESTAMP.with_label_values(&label_values).set(timestamp_ms as f64);
 
           metrics::CROWDSTRIKE_INSTALLED.with_label_values(&label_values).set(statement.read::<f64>(10).unwrap_or(-1.0));
           metrics::CROWDSTRIKE_LAST_SEEN_TIMESTAMP.with_label_values(&label_values).set(crowdstrike_last_seen_timestamp_ms as f64);
@@ -176,10 +179,13 @@ fn main() {
           metrics::DURATION.with_label_values(&label_values);
           metrics::BYTES_IN.with_label_values(&label_values);
           metrics::BYTES_OUT.with_label_values(&label_values);
+<<<<<<< HEAD
           metrics::RECORD_TIMESTAMP.with_label_values(&label_values);
           metrics::CROWDSTRIKE_INSTALLED.with_label_values(&label_values);
           metrics::CROWDSTRIKE_LAST_SEEN_TIMESTAMP.with_label_values(&label_values);
           metrics::CROWDSTRIKE_LAST_CHECK_TIMESTAMP.with_label_values(&label_values);
+=======
+>>>>>>> parent of b7c6f85 (added record timestamp metrics)
         }
 
         // Gather the metrics.
