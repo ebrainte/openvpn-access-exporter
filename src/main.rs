@@ -29,8 +29,9 @@ fn main() {
             .short("f")
             .long("file")
             .help("SQLite log file (log.db)")
-            .required(true)
+            .required(false)
             .takes_value(true)
+            .default_value("/log.db")
         )
         .arg(Arg::with_name("port")
             .short("p")
@@ -52,8 +53,9 @@ fn main() {
             .short("g")
             .long("geofile")
             .help("GeoLite2 City file (GeoLite2-City.mmdb)")
-            .required(true)
+            .required(false)
             .takes_value(true)
+            .default_value("/GeoLite2-City.mmdb")
         )
         .get_matches();
 
