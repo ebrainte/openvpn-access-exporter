@@ -48,10 +48,15 @@ fn main() {
             .takes_value(true)
             .default_value("0.0.0.0")
         )
+        .arg(Arg::with_name("geofile")
+            .short("g")
+            .long("geofile")
+            .help("GeoLite2 City file (GeoLite2-City.mmdb)")
+            .required(true)
+            .takes_value(true)
+        )
         .get_matches();
 
-    //let ovpn_log = flags.value_of("file").unwrap();
-    //let ovpn_log = format!("{}", flags.value_of("file").unwrap())[..];
     let expose_port = flags.value_of("port").unwrap();
     let expose_host = flags.value_of("host").unwrap();
 
@@ -60,6 +65,7 @@ fn main() {
     Builder::from_env(Env::default().default_filter_or("info")).init();
 
     info!("Using file: {}", flags.value_of("file").unwrap());
+    info!("Using geofile: {}", flags.value_of("geofile").unwrap());
 
     // Parse address used to bind exporter to.
     let addr_raw = expose_host.to_owned() + ":" + expose_port;
@@ -67,19 +73,27 @@ fn main() {
 
     let new_service = move || {
       let ovpn_log = flags.value_of("file").unwrap();
+      let ovpn_geo = flags.value_of("geofile").unwrap();
 
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
+      let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
 
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
-        let georeader =  maxminddb::Reader::open_readfile("/usr/share/geoip/GeoLite2-City.mmdb").unwrap();
+        
+        // let mut user_count = 0;
 
         let mut statement = connection
             .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
+
+        // info!("Using statement: {}", statement);
         while let State::Row = statement.next().unwrap() {
+
+          // user_count += 1;
+          metrics::USER_COUNT.inc();
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
           
           let city: std::result::Result<Option<geoip2::City>, maxminddb::MaxMindDBError> = georeader.lookup(ip);
@@ -118,6 +132,8 @@ fn main() {
           metrics::BYTES_OUT.with_label_values(&label_values);
           metrics::RECORD_TIMESTAMP.with_label_values(&label_values);
         }
+
+        //metrics::USER_COUNT.set(user_count as f64);
 
         // Gather the metrics.
         let mut buffer = vec![];
