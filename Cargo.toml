@@ -1,8 +1,12 @@
 [package]
 name = "openvpn-access-exporter"
-version = "2.0.7"
+version = "2.0.21"
 authors = ["Luis Felipe Domínguez Vega <ldominguezvega@gmail.com>"]
 edition = "2018"
+[[bin]]
+name = "openvpn-access-exporter"
+path = "src/main.rs"
+
 
 [dependencies]
 env_logger = "0.6.2"
