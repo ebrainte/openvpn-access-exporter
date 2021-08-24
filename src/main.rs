@@ -22,7 +22,7 @@ mod metrics;
 
 fn main() {
     let flags = App::new("openvpn-access-exporter")
-        .version("0.1")
+        .version("2.0.21")
         .about("Prometheus exporter for OpenVPN Access Server")
         .author("Luis Felipe Domínguez Vega <ldominguezvega@gmail.com>")
         .arg(Arg::with_name("file")
@@ -80,7 +80,8 @@ fn main() {
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
       let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
-
+      
+      metrics::USER_COUNT.reset();
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
