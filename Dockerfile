@@ -24,6 +24,5 @@ RUN RUSTFLAGS=-Clinker=musl-gcc CARGO_TARGET_DIR=./bin cargo build --release --t
 # Bundle Stage
 FROM scratch
 COPY --from=builder /usr/src/openvpn-access-exporter/bin/x86_64-unknown-linux-musl/release/openvpn-access-exporter .
-USER 1000
 ENTRYPOINT ["./openvpn-access-exporter"]
 CMD [ "-V" ]
