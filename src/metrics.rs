@@ -1,8 +1,8 @@
-use prometheus::{GaugeVec, Counter};
+use prometheus::{GaugeVec, Counter, IntCounter};
 
 lazy_static! {
 
-  pub static ref ACCESS_COUNTER: Counter = register_counter!("access_counter", "Requests counter")
+  pub static ref ACCESS_COUNTER: Counter = register_counter!("openvpn_access_counter", "Requests counter")
     .unwrap();
   pub static ref BYTES_IN: GaugeVec = register_gauge_vec!("openvpn_user_bytes_in", "Bytes in",
     &["session_id", "node", "username", "common_name", "real_ip", "vpn_ip", "location", "lat", "lon"])
@@ -19,6 +19,6 @@ lazy_static! {
   // pub static ref USER_COUNT: GaugeVec = register_gauge_vec!("openvpn_user_count", "Number Of Connected Clients",
   //   &["node"])
   //   .expect("can not create gauge openvpn_user_count");
-  pub static ref USER_COUNT: Counter = register_counter!("openvpn_user_count", "Users")
+  pub static ref USER_COUNT: IntCounter = register_int_counter!("openvpn_user_count", "Users")
   .unwrap();
 }

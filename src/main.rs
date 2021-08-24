@@ -80,13 +80,12 @@ fn main() {
       let encoder = TextEncoder::new();
       let connection = sqlite::open(&ovpn_log).unwrap();
       let georeader =  maxminddb::Reader::open_readfile(&ovpn_geo).unwrap();
-      
-      metrics::USER_COUNT.reset();
+
       service_fn_ok(move |_request| {
 
         metrics::ACCESS_COUNTER.inc();
         
-        // let mut user_count = 0;
+        metrics::USER_COUNT.reset();
 
         let mut statement = connection
             .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
@@ -95,7 +94,6 @@ fn main() {
         // info!("Using statement: {}", statement);
         while let State::Row = statement.next().unwrap() {
 
-          // user_count += 1;
           metrics::USER_COUNT.inc();
           let ip: IpAddr = statement.read::<String>(4).unwrap().parse().unwrap();
           
@@ -135,8 +133,6 @@ fn main() {
           metrics::BYTES_OUT.with_label_values(&label_values);
           metrics::RECORD_TIMESTAMP.with_label_values(&label_values);
         }
-
-        //metrics::USER_COUNT.set(user_count as f64);
 
         // Gather the metrics.
         let mut buffer = vec![];
