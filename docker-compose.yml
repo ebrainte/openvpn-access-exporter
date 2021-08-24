@@ -1,0 +1,24 @@
+# https://docs.docker.com/compose/compose-file/
+version: "3.3"
+
+services:
+  openvpn-access-exporter:
+    container_name: openvpn-access-exporter
+    image: ebrainte/openvpn-access-exporter
+    tty: true
+    hostname: openvpn-access-exporter
+    volumes:
+      - type: bind
+        source: /path/to/logdb/log.db
+        target: /log.db
+        read_only: true
+      - type: bind
+        source: /path/to/geolite2/GeoLite2-City.mmdb
+        target: /GeoLite2-City.mmdb
+        read_only: true
+    ports:
+      - 9185:9185
+    restart: always
+    command: 
+      - -f 
+      - /log.db

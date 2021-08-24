@@ -1,14 +1,16 @@
 Prometheus OpenVPN Access Exporter
 ==================================
-[![Build Status](https://travis-ci.com/lfdominguez/openvpn-access-exporter.svg?branch=master)](https://travis-ci.com/lfdominguez/openvpn-access-exporter)
-[![Build status](https://ci.appveyor.com/api/projects/status/m97n73atmvnj5lox?svg=true)](https://ci.appveyor.com/project/lfdominguez/openvpn-access-exporter)
+![Build status](https://github.com/ebrainte/openvpn-access-exporter/actions/workflows/main.yml/badge.svg)
 
+
+Original Credits to lfdominguez and christianbeland
 This is my first Rust program. Take the SQLite db `log.db` of OpenVPN Access Server and expose this metrics to Prometheus.
 
 Metrics:
   * Session duration with `openvpn_user_duration`
   * Bytes downloaded on session with `openvpn_user_bytes_in`
   * Bytes uploaded on session with`openvpn_user_bytes_out`
+  * Logged in user count with `openvpn_user_count`
 
 with labels:
   * `session_id`
@@ -21,7 +23,7 @@ with labels:
 CLI reference:
 ```
 USAGE:
-    openvpn-access-exporter [OPTIONS] --file <file>
+    openvpn-access-exporter [OPTIONS] --file <file> --geofile <GeoLite2-City file>
 
 FLAGS:
         --help       Prints help information
