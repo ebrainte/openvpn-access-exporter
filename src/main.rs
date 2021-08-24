@@ -88,7 +88,7 @@ fn main() {
         metrics::USER_COUNT.reset();
 
         let mut statement = connection
-            .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp, start_time FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-10 days'))")
+            .prepare("SELECT session_id, node, username, common_name, real_ip, vpn_ip, duration, bytes_in, bytes_out, timestamp, start_time FROM log WHERE active = 1 and auth = 1 and start_time >= strftime('%s', datetime('now','-1 days'))")
             .unwrap();
 
         // info!("Using statement: {}", statement);
